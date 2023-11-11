@@ -19,7 +19,9 @@ const WIDE_MODULUS: U512 = U512::from_be_hex(concat!(
     "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed"
 ));
 
-const SQRT_MINUS_ONE: Fe25519 =
+pub(crate) const MINUS_ONE: Fe25519 = Fe25519(U256::from_be_hex("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffec"));
+
+pub(crate) const SQRT_MINUS_ONE: Fe25519 =
     Fe25519(U256::from_be_hex
     ("2b8324804fc1df0b2b4d00993dfbd7a72f431806ad2fe478c4ee1b274a0ea0b0"));
 
@@ -263,6 +265,64 @@ impl PrimeFieldBits for Fe25519 {
 impl Fe25519 {
     pub fn get_value(&self) -> U256 {
         self.0
+    }
+
+    pub fn is_negative(&self) -> Choice {
+        let bytes = self.to_repr();
+        (bytes[0] & 1).into()
+    }
+
+    pub fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
+        if choice.unwrap_u8() == 0u8 {
+            *a
+        } else {
+            *b
+        }
+    }
+
+    pub fn conditional_assign(&mut self, other: &Self, choice: Choice) {
+        *self = Self::conditional_select(self, other, choice);
+    }
+
+    pub fn conditional_negate(&mut self, choice: Choice) {
+        let self_neg = self.neg();
+        self.conditional_assign(&self_neg, choice);
+    }
+
+    pub fn sqrt_ratio_i(u: Self, v: Self) -> (Choice, Self) {
+        let v3 = v.square()  * v;
+        let v7 = v3.square() * v;
+
+        let one_by_eight = Fe25519::from(8u64).invert().unwrap();
+        let exponent = (FIELD_MODULUS - Fe25519::from(5u64))*one_by_eight;
+        let mut r = (u * v3) * (u * v7).pow_vartime(exponent);
+
+        let check = v * r.square();
+
+        let i = SQRT_MINUS_ONE;
+
+        let correct_sign_sqrt   = check.ct_eq(       &u);
+        let flipped_sign_sqrt   = check.ct_eq(     &(-u));
+        let flipped_sign_sqrt_i = check.ct_eq(&((-u)*i));
+
+        let r_prime = SQRT_MINUS_ONE * &r;
+        r.conditional_assign(&r_prime, flipped_sign_sqrt | flipped_sign_sqrt_i);
+
+        // Choose the nonnegative square root.
+        let r_is_negative = r.is_negative();
+        r.conditional_negate(r_is_negative);
+
+        let was_nonzero_square = correct_sign_sqrt | flipped_sign_sqrt;
+
+        (was_nonzero_square, r) 
+    }
+
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        let mut tmp = bytes;
+        let mask = 0b01111111;
+        tmp[31] = tmp[31] & mask;
+        let out = Self(U256::from_le_bytes(tmp).checked_rem(&MODULUS).unwrap());
+        out
     }
 }
   
