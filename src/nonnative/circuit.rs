@@ -1,7 +1,7 @@
 use std::ops::{Add, Sub, Mul, Rem};
-use bellperson::gadgets::num::AllocatedNum;
-use bellperson::{ConstraintSystem, SynthesisError, LinearCombination, Variable};
-use bellperson::gadgets::boolean::{AllocatedBit, Boolean};
+use bellpepper_core::num::AllocatedNum;
+use bellpepper_core::{ConstraintSystem, SynthesisError, LinearCombination, Variable};
+use bellpepper_core::boolean::{AllocatedBit, Boolean};
 use ff::{PrimeField, PrimeFieldBits};
 use num_bigint::BigUint;
 use num_traits::Zero;
@@ -1624,7 +1624,7 @@ mod tests {
     use crate::curve::Ed25519Curve;
 
     use super::*;
-    use bellperson::gadgets::test::TestConstraintSystem;
+    use bellpepper_core::test_cs::TestConstraintSystem;
     use crypto_bigint::{U256, Random, Integer};
     use num_traits::Zero;
     use pasta_curves::Fp;
